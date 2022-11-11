@@ -8,6 +8,8 @@ namespace: <+infra.namespace>
 
 containerPort: 80
 
+createCanary: true
+
 serviceType: ClusterIP
 servicePort: 80
 serviceTargetPort: 8080

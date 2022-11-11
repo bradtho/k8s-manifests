@@ -10,3 +10,20 @@ spec:
     protocol: TCP
   selector:
     app: {{.Values.name}}
+
+---
+
+{{- if .Values.createCanary}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.name}}-canary-svc
+spec:
+  type: {{.Values.serviceType}}
+  ports:
+  - port: {{.Values.servicePort}}
+    targetPort: {{.Values.serviceTargetPort}}
+    protocol: TCP
+  selector:
+    harness.io/track: canary
+{{- end}}
