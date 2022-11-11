@@ -1,5 +1,5 @@
 name: <+service.name>
-replicas: 1
+replicas: 3
 
 image: <+artifact.image>
 
@@ -8,7 +8,7 @@ namespace: <+infra.namespace>
 
 containerPort: 80
 
-createCanary: true
+createCanary: false
 
 serviceType: ClusterIP
 servicePort: 80
