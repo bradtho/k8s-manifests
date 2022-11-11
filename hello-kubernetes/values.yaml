@@ -1,0 +1,13 @@
+name: <+service.name>
+replicas: 1
+
+image: <+artifact.image>
+
+createNamespace: true
+namespace: <+infra.namespace>
+
+containerPort: 80
+
+serviceType: ClusterIP
+servicePort: 80
+serviceTargetPort: 8080
