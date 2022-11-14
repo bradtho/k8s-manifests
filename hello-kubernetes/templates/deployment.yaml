@@ -18,3 +18,39 @@ spec:
         image: {{.Values.image}}
         ports:
         - containerPort: {{int .Values.containerPort}}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Values.name}}-svc
+spec:
+  type: {{.Values.serviceType}}
+  ports:
+  - port: {{.Values.servicePort}}
+    targetPort: {{.Values.serviceTargetPort}}
+    protocol: TCP
+  selector:
+    app: {{.Values.name}}
+
+---
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{.Values.name}}-ingress
+  labels:
+    app: {{.Values.name}}
+spec:
+  rules:
+  - host: www.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{.Values.name}}-svc
+            port: 
+              number: 80
