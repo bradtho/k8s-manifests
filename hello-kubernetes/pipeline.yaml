@@ -1,0 +1,185 @@
+pipeline:
+  name: canary-testing
+  identifier: canarytesting
+  projectIdentifier: sandpit
+  orgIdentifier: default
+  tags: {}
+  stages:
+    - stage:
+        name: Deploy Base
+        identifier: deploybase
+        description: ""
+        type: Deployment
+        spec:
+          deploymentType: Kubernetes
+          service:
+            serviceRef: basedeployment
+            serviceInputs:
+              serviceDefinition:
+                type: Kubernetes
+                spec:
+                  artifacts:
+                    primary:
+                      primaryArtifactRef: <+input>
+                      sources: <+input>
+          environment:
+            environmentRef: dev
+            deployToAll: false
+            infrastructureDefinitions:
+              - identifier: microk8s
+          execution:
+            steps:
+              - step:
+                  name: Rollout Deployment
+                  identifier: rolloutDeployment
+                  type: K8sRollingDeploy
+                  timeout: 10m
+                  spec:
+                    skipDryRun: false
+                    pruningEnabled: false
+              - stepGroup:
+                  name: Baseline Testing
+                  identifier: Baseline_Testing
+                  steps:
+                    - step:
+                        type: ShellScript
+                        name: Curl Baseline
+                        identifier: Curl_Baseline
+                        spec:
+                          shell: Bash
+                          onDelegate: true
+                          source:
+                            type: Inline
+                            spec:
+                              script: |-
+                                for i in {1..10}
+                                do
+                                    curl -H "Host: www.example.com" http://10.10.10.69 | grep base-deployment
+                                done
+                          environmentVariables: []
+                          outputVariables: []
+                        timeout: 10m
+              - parallel:
+                  - step:
+                      type: K8sCanaryDeploy
+                      name: Canary Deployment
+                      identifier: Canary_Deployment
+                      spec:
+                        skipDryRun: false
+                        instanceSelection:
+                          type: Count
+                          spec:
+                            count: 1
+                      timeout: 10m
+                      failureStrategies: []
+                  - step:
+                      type: K8sApply
+                      name: Canary Resources
+                      identifier: Canary_Resources
+                      spec:
+                        filePaths:
+                          - canary.yaml
+                        skipDryRun: false
+                        skipSteadyStateCheck: false
+                        skipRendering: false
+                        overrides: []
+                      timeout: 10m
+              - stepGroup:
+                  name: Canary Testing
+                  identifier: Canary_Testing
+                  steps:
+                    - step:
+                        type: ShellScript
+                        name: Curl Canary
+                        identifier: Curl_Canary
+                        spec:
+                          shell: Bash
+                          onDelegate: true
+                          source:
+                            type: Inline
+                            spec:
+                              script: |-
+                                for i in {1..20}
+                                do
+                                    curl -H "Host: www.example.com" http://10.10.10.69 | grep base-deployment
+                                done
+                          environmentVariables: []
+                          outputVariables: []
+                        timeout: 10m
+                        failureStrategies: []
+                    - step:
+                        type: K8sApply
+                        name: Canary Resources Scaling
+                        identifier: Canary_Resources_Scaling
+                        spec:
+                          filePaths:
+                            - canary50.yaml
+                          skipDryRun: false
+                          skipSteadyStateCheck: false
+                          skipRendering: false
+                          overrides: []
+                        timeout: 10m
+                    - step:
+                        type: ShellScript
+                        name: Curl Canary Scale
+                        identifier: Curl_Canary_Scale
+                        spec:
+                          shell: Bash
+                          onDelegate: true
+                          source:
+                            type: Inline
+                            spec:
+                              script: |-
+                                for i in {1..20}
+                                do
+                                    curl -H "Host: www.example.com" http://10.10.10.69 | grep base-deployment
+                                done
+                          environmentVariables: []
+                          outputVariables: []
+                        timeout: 10m
+              - stepGroup:
+                  name: Canary Cleanup
+                  identifier: Canary_Cleanup
+                  steps:
+                    - step:
+                        type: K8sCanaryDelete
+                        name: Canary Delete
+                        identifier: Canary_Delete
+                        spec:
+                          skipDryRun: false
+                        timeout: 10m
+                    - step:
+                        type: K8sDelete
+                        name: Service and Ingress Delete
+                        identifier: Service_and_Ingress_Delete
+                        spec:
+                          deleteResources:
+                            type: ResourceName
+                            spec:
+                              resourceNames:
+                                - development/Ingress/base-deployment-canary-ingress
+                                - development/Service/base-deployment-canary-svc
+                        timeout: 10m
+            rollbackSteps:
+              - step:
+                  name: Rollback Rollout Deployment
+                  identifier: rollbackRolloutDeployment
+                  type: K8sRollingRollback
+                  timeout: 10m
+                  spec:
+                    pruningEnabled: false
+        tags: {}
+        failureStrategies:
+          - onFailure:
+              errors:
+                - AllErrors
+              action:
+                type: StageRollback
+  properties:
+    ci:
+      codebase:
+        connectorRef: account.Github_OAuth_1661164576460
+        repoName: bradtho/harness-config
+        build: <+input>
+        sslVerify: true
+        prCloneStrategy: MergeCommit
